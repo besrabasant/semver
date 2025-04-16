@@ -129,7 +129,6 @@ fn update_package_json(new_version: &str) {
     }
 }
 
-
 fn update_composer_json(new_version: &str) {
     let path = "composer.json";
     if !Path::new(path).exists() {

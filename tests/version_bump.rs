@@ -9,7 +9,6 @@ use std::{
 static INIT: Once = Once::new();
 static CLEANUP: Once = Once::new();
 
-
 fn init_tmp_root() {
     INIT.call_once(|| {
         let _ = fs::create_dir_all("./tmp-test");
@@ -53,7 +52,6 @@ fn make_test_dir(name: &str) -> PathBuf {
 fn write_file(path: &Path, filename: &str, content: &str) {
     fs::write(path.join(filename), content).expect("Failed to write test file");
 }
-
 
 #[test]
 fn test_bump_with_composer_json_priority() {
