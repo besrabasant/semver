@@ -1,0 +1,33 @@
+# Cargo build files
+/target
+**/*.rs.bk
+
+# IDEs and editors
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Binaries
+*.exe
+*.out
+*.log
+*.tmp
+*.bak
+*.old
+*.dSYM/
+*.rlib
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Temp test directory
+/tmp-test/
+
+# Cargo lock if this is a library
+# Uncomment this if you're writing a library crate
+# Cargo.lock
+
+# Generated files
+bin/
