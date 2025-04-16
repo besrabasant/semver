@@ -1,9 +1,10 @@
 use clap::Parser;
-use dialoguer::Select;
 use indexmap::IndexMap;
+use inquire::{Select, error::InquireError};
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::io::{self, Write};
 use std::{fs, path::Path, process::exit};
 
 #[derive(Deserialize, Serialize)]
@@ -52,6 +53,39 @@ mod ordered_json_map {
     }
 }
 
+fn prompt_bump_type() -> String {
+    let choices = vec!["major", "minor", "patch"];
+
+    match Select::new("What would you like to bump?", choices.clone())
+        .with_starting_cursor(2)
+        .prompt()
+    {
+        Ok(choice) => choice.to_string(),
+        Err(InquireError::OperationCanceled) | Err(InquireError::OperationInterrupted) => {
+            // Exit cleanly on Ctrl+C or ESC
+            std::process::exit(130); // 130 = standard exit code for SIGINT
+        }
+        Err(_) => {
+            println!("What would you like to bump? [major|minor|patch] (default: patch): ");
+            print!("> ");
+            io::stdout().flush().unwrap();
+
+            let mut input = String::new();
+            io::stdin().read_line(&mut input).unwrap();
+            let trimmed = input.trim();
+
+            match trimmed {
+                "major" | "minor" | "patch" => trimmed.to_string(),
+                "" => "patch".to_string(),
+                _ => {
+                    eprintln!("Invalid input. Defaulting to patch.");
+                    "patch".to_string()
+                }
+            }
+        }
+    }
+}
+
 fn main() {
     let args = Args::parse();
 
@@ -63,19 +97,7 @@ fn main() {
     let mut version = Version::parse(&current_version).expect("Invalid semantic version");
     println!("Current version: {}", version);
 
-    let bump_type = match args.bump {
-        Some(t) => t,
-        None => {
-            let choices = vec!["major", "minor", "patch"];
-            let selection = Select::new()
-                .with_prompt("What would you like to bump?")
-                .items(&choices)
-                .default(2)
-                .interact()
-                .unwrap();
-            choices[selection].to_string()
-        }
-    };
+    let bump_type = args.bump.unwrap_or_else(prompt_bump_type);
 
     match bump_type.as_str() {
         "major" => {
