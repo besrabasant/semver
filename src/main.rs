@@ -115,11 +115,16 @@ fn update_package_json(new_version: &str) {
     }
 
     if let Ok(contents) = fs::read_to_string(path) {
-        let result = serde_json::from_str::<serde_json::Value>(&contents);
-        if let Ok(mut json_value) = result {
-            if let Some(version) = json_value.get_mut("version") {
+        let mut json_value: serde_json::Value = match serde_json::from_str(&contents) {
+            Ok(v) => v,
+            Err(_) => return,
+        };
+
+        if let Some(obj) = json_value.as_object_mut() {
+            if let Some(version) = obj.get_mut("version") {
                 if version.is_string() {
                     *version = serde_json::Value::String(new_version.to_string());
+
                     if let Ok(updated) = serde_json::to_string_pretty(&json_value) {
                         let _ = fs::write(path, updated);
                     }
@@ -136,10 +141,20 @@ fn update_composer_json(new_version: &str) {
     }
 
     if let Ok(contents) = fs::read_to_string(path) {
-        if let Ok(mut json) = serde_json::from_str::<ComposerJson>(&contents) {
-            json.version = new_version.to_string();
-            if let Ok(updated) = serde_json::to_string_pretty(&json) {
-                let _ = fs::write(path, updated);
+        let mut json_value: serde_json::Value = match serde_json::from_str(&contents) {
+            Ok(v) => v,
+            Err(_) => return,
+        };
+
+        if let Some(obj) = json_value.as_object_mut() {
+            if let Some(version) = obj.get_mut("version") {
+                if version.is_string() {
+                    *version = serde_json::Value::String(new_version.to_string());
+
+                    if let Ok(updated) = serde_json::to_string_pretty(&json_value) {
+                        let _ = fs::write(path, updated);
+                    }
+                }
             }
         }
     }
