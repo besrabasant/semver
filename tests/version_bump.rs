@@ -139,3 +139,50 @@ fn test_no_version_file_exists() {
         .failure()
         .stderr(contains("No version found"));
 }
+
+#[test]
+fn test_preserves_key_order_in_package_json() {
+    let path = make_test_dir("preserve-order");
+
+    write_file(
+        &path,
+        "package.json",
+        r#"{
+  "name": "test",
+  "version": "0.0.1",
+  "description": "important",
+  "scripts": {
+    "start": "node index.js"
+  }
+}"#,
+    );
+
+    let mut cmd = Command::cargo_bin("semver").unwrap();
+    cmd.current_dir(&path)
+        .arg("--bump")
+        .arg("patch")
+        .assert()
+        .success();
+
+    let updated = fs::read_to_string(path.join("package.json")).unwrap();
+    let lines: Vec<_> = updated.lines().collect();
+
+    // Check order: name → version → description → scripts
+    assert!(
+        lines.iter().position(|l| l.contains("\"name\"")).unwrap()
+            < lines
+                .iter()
+                .position(|l| l.contains("\"version\""))
+                .unwrap()
+    );
+    assert!(
+        lines
+            .iter()
+            .position(|l| l.contains("\"version\""))
+            .unwrap()
+            < lines
+                .iter()
+                .position(|l| l.contains("\"description\""))
+                .unwrap()
+    );
+}

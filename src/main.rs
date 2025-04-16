@@ -1,7 +1,9 @@
 use clap::Parser;
 use dialoguer::Select;
+use indexmap::IndexMap;
 use semver::Version;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::{fs, path::Path, process::exit};
 
 #[derive(Deserialize, Serialize)]
@@ -25,6 +27,29 @@ struct Args {
     /// Optional version bump type: major, minor, patch
     #[arg(long)]
     bump: Option<String>,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(transparent)]
+struct OrderedJson(#[serde(with = "ordered_json_map")] IndexMap<String, Value>);
+
+mod ordered_json_map {
+    use super::*;
+    use serde::{Deserializer, Serializer};
+
+    pub fn serialize<S>(map: &IndexMap<String, Value>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        map.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<IndexMap<String, Value>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        IndexMap::<String, Value>::deserialize(deserializer)
+    }
 }
 
 fn main() {
@@ -107,57 +132,42 @@ fn get_current_version() -> Option<String> {
 
     None
 }
-
-fn update_package_json(new_version: &str) {
-    let path = "package.json";
+fn update_json_version(path: &str, new_version: &str) {
     if !Path::new(path).exists() {
         return;
     }
 
-    if let Ok(contents) = fs::read_to_string(path) {
-        let mut json_value: serde_json::Value = match serde_json::from_str(&contents) {
-            Ok(v) => v,
-            Err(_) => return,
-        };
+    let contents = match fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(_) => return,
+    };
 
-        if let Some(obj) = json_value.as_object_mut() {
-            if let Some(version) = obj.get_mut("version") {
-                if version.is_string() {
-                    *version = serde_json::Value::String(new_version.to_string());
+    let mut ordered: OrderedJson = match serde_json::from_str(&contents) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
 
-                    if let Ok(updated) = serde_json::to_string_pretty(&json_value) {
-                        let _ = fs::write(path, updated);
-                    }
-                }
-            }
+    let map = &mut ordered.0;
+    let mut updated = false;
+
+    if let Some(Value::String(version)) = map.get_mut("version") {
+        *version = new_version.to_string();
+        updated = true;
+    }
+
+    if updated {
+        if let Ok(output) = serde_json::to_string_pretty(&ordered) {
+            let _ = fs::write(path, output);
         }
     }
 }
 
+fn update_package_json(new_version: &str) {
+    update_json_version("package.json", new_version);
+}
+
 fn update_composer_json(new_version: &str) {
-    let path = "composer.json";
-    if !Path::new(path).exists() {
-        return;
-    }
-
-    if let Ok(contents) = fs::read_to_string(path) {
-        let mut json_value: serde_json::Value = match serde_json::from_str(&contents) {
-            Ok(v) => v,
-            Err(_) => return,
-        };
-
-        if let Some(obj) = json_value.as_object_mut() {
-            if let Some(version) = obj.get_mut("version") {
-                if version.is_string() {
-                    *version = serde_json::Value::String(new_version.to_string());
-
-                    if let Ok(updated) = serde_json::to_string_pretty(&json_value) {
-                        let _ = fs::write(path, updated);
-                    }
-                }
-            }
-        }
-    }
+    update_json_version("composer.json", new_version);
 }
 
 fn update_version_file(new_version: &str) {
